@@ -43,6 +43,7 @@ const intents = {
   low_fat: /(malo.?masti|nisko.?masti|bez masti|odmast)/i,
   high_fat: /(puno.?masti|mnogo masti|bogato masti|masno)/i,
   quick: /(brz|jednostavn|lak|kratko vrijeme|kratak)/i,
+  simple: /(jednostav|jednostavno|jednostavni|jednostavan)/i,
   newest: /(najnovij|najnoviji|nov|zadnj|recent)/i,
   best_rated: /(najbolj|ocjen|popularn|top)/i,
   ingredient: /(sa |s |imam |sadrži |sastojak|\b(sir|cheese|mascarpone|parmezan|parmez|feta|cokolad[a-z]*|čokolad[a-z]*)\b)/i,
@@ -55,14 +56,8 @@ const intents = {
 
 const DiabetoChatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-      const stored = localStorage.getItem('chatHistory');
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // Start with an empty conversation on each page load (do not restore previous chat)
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [hasRolledIn, setHasRolledIn] = useState<boolean>(() => {
@@ -78,6 +73,7 @@ const DiabetoChatbot: React.FC = () => {
   const [showSpeechBubble, setShowSpeechBubble] = useState(false);
   const [smokeParticles, setSmokeParticles] = useState<SmokeParticle[]>([]);
   const [bounceCount, setBounceCount] = useState(0);
+  const [rollerSpeech, setRollerSpeech] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevLenRef = useRef<number>(messages.length);
@@ -95,33 +91,46 @@ const DiabetoChatbot: React.FC = () => {
           // ignore
         }
         
-        // Generate smoke particles during roll
+        // Use requestAnimationFrame for a smooth, time-based animation
+        const start = performance.now();
+        const startX = -100; // start further left so the roll begins off-screen
+        const endX = Math.max(window.innerWidth - 100, 200);
+        const duration = 6000; // ms - total time for the roll (slower, ~5.5s)
+        let rafId: number | null = null;
+
+        // Less frequent particles; capture a snapshot of rollPosition each tick
         const smokeInterval = setInterval(() => {
           setSmokeParticles(prev => [
             ...prev.slice(-10),
             {
               id: Date.now(),
-              x: rollPosition - 20,
+              x: Math.round(rollPosition) - 20,
               y: Math.random() * 20 - 10,
               opacity: 1,
             }
           ]);
-        }, 100);
+        }, 240);
 
-        // Animate roll
-        let pos = -100;
-        const rollInterval = setInterval(() => {
-          pos += 15;
-          setRollPosition(pos);
-          
-          if (pos >= window.innerWidth - 100) {
-            clearInterval(rollInterval);
+        // Use linear timing so move + rotation feel constant across the whole roll
+        const linear = (t: number) => t;
+
+        const step = (now: number) => {
+          const elapsed = now - start;
+          const progress = Math.min(1, elapsed / duration);
+          const eased = linear(progress);
+          const current = startX + (endX - startX) * eased;
+          // round to integer to avoid subpixel blurring
+          setRollPosition(Math.round(current));
+
+          if (progress < 1) {
+            rafId = requestAnimationFrame(step);
+          } else {
+            // finished
+            if (rafId) cancelAnimationFrame(rafId);
             clearInterval(smokeInterval);
-            
-            // Stop rolling, start bouncing
             setIsRolling(false);
             setIsBouncing(true);
-            
+
             // Bounce animation starts after rolling stops
             let bounce = 0;
             const bounceInterval = setInterval(() => {
@@ -129,24 +138,30 @@ const DiabetoChatbot: React.FC = () => {
               setBounceCount(bounce);
               if (bounce >= 3) {
                 clearInterval(bounceInterval);
-                setBounceCount(0); // Reset bounce count after animation
-                setIsBouncing(false); // Stop bouncing
-                
-                // Show speech bubble after bounce finishes
+                setBounceCount(0);
+                setIsBouncing(false);
+
+                // Show a short utterance (breath) then the main speech bubble
                 setTimeout(() => {
-                  setShowSpeechBubble(true);
-                  // Hide after 5 seconds
-                  setTimeout(() => setShowSpeechBubble(false), 5000);
+                  setRollerSpeech('Hoo… huff… hoo...');
+                  setTimeout(() => {
+                    setRollerSpeech('');
+                    setShowSpeechBubble(true);
+                    setTimeout(() => setShowSpeechBubble(false), 5000);
+                  }, 1200);
                 }, 300);
               }
             }, 150);
           }
-        }, 16);
+        };
+
+        rafId = requestAnimationFrame(step);
 
         return () => {
-          clearInterval(rollInterval);
+          if (rafId) cancelAnimationFrame(rafId);
           clearInterval(smokeInterval);
         };
+
       }, 1500); // Start after splash screen
 
       return () => clearTimeout(timer);
@@ -169,10 +184,10 @@ const DiabetoChatbot: React.FC = () => {
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const greeting: Message = {
-        id: 1,
-        text: "Bok! 👋 Ja sam Dijabeto, tvoj kulinarski asistent!\n\nMogu ti preporučiti recepte po ukusu, sastojcima ili prehrani.\n\nReci mi što želiš — npr:\n• \"Daj mi nešto slatko\"\n• \"Želim bez glutena\"\n• \"Koji je najnoviji recept?\"\n• \"Preporuči mi nešto brzo\"\n• \"Imam gljive, što mogu napraviti?\"",
-        isBot: true,
-      };
+          id: 1,
+          text: "Bok! 👋 Ja sam Dijabeto — tvoj kulinarski asistent i vodič kroz recepte.\n\nMogu ti:\n• Preporučiti recepte po kategoriji (desert, pasta, meso, riba, salata)\n• Pronaći recepte po sastojku (npr. 's čokoladom' ili 's piletinom')\n• Filtrirati po prehrani (vegan, vegetarijansko, bez glutena)\n• Predložiti brze recepte ili nutritivno prilagođene (nisko-kalorično, više proteina)\n\nPrimjeri upita:\n• \"Daj mi nešto slatko\" \n• \"Daj mi veganske recepte\" \n• \"Daj mi recepte s puno proteina\"\n • \"Daj mi recepte s malo kalorija\"  \n• \"Daj mi brz recept\" \n• \"Trebam recepte bez glutena\"\n• \"Pokaži najnovije recepte\" \n\nKlikni chat da počnemo!",
+          isBot: true,
+        };
       setMessages([greeting]);
     }
   }, [isOpen, messages.length]);
@@ -238,14 +253,7 @@ const DiabetoChatbot: React.FC = () => {
     });
   }, [messages]);
 
-  // Persist chat history to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('chatHistory', JSON.stringify(messages));
-    } catch (e) {
-      // ignore if localStorage is full or unavailable
-    }
-  }, [messages]);
+  // Note: chat history persistence disabled — conversation resets on page load
 
   // Focus input when opened
   useEffect(() => {
@@ -306,6 +314,7 @@ const DiabetoChatbot: React.FC = () => {
     if (intents.low_fat.test(lowerText)) return 'low_fat';
     if (intents.high_fat.test(lowerText)) return 'high_fat';
     if (intents.quick.test(lowerText)) return 'quick';
+    if (intents.simple.test(lowerText)) return 'simple';
     if (intents.category_dessert.test(lowerText)) return 'category_dessert';
     if (intents.category_pasta.test(lowerText)) return 'category_pasta';
     if (intents.category_meat.test(lowerText)) return 'category_meat';
@@ -318,6 +327,16 @@ const DiabetoChatbot: React.FC = () => {
     if (intents.gallery.test(lowerText)) return 'gallery';
     if (intents.all_recipes.test(lowerText)) return 'all_recipes';
     if (intents.ingredient.test(lowerText)) return 'ingredient';
+
+    // Extra checks for explicit gluten restriction phrasing (e.g. "ne mogu jesti gluten")
+    // Match patterns like: "ne mogu jesti gluten", "ne smijem jesti gluten", "imam alergiju na gluten", "nemogu jesti gluten"
+    try {
+      if (/(?:ne\s?mogu|ne\s?smijem|nemogu|imam alergij|alergij(a|u) na)/i.test(lowerText) && /gluten/.test(lowerText)) {
+        return 'gluten_free';
+      }
+    } catch (e) {
+      // ignore regex errors
+    }
 
     // Dynamic ingredient detection: check if normalized input matches any token/stem from recipes
     try {
@@ -475,7 +494,7 @@ const DiabetoChatbot: React.FC = () => {
     switch (intent) {
       case 'greeting':
         return {
-          text: "Bok! 😊 Drago mi je da si tu! Kako ti mogu pomoći danas?\n\nMogu ti preporučiti recepte po kategoriji, sastojcima, ili prehrambenoj preferenciji. Samo pitaj!"
+          text: "Hej! 😊 Drago mi je što si ovdje — ja sam Dijabeto.\n\nEvo kako ti mogu pomoći odmah:\n• Preporuke po žanru: deserti, paste, mesna jela, riba, salate\n• Po sastojku: napiši što imaš u frižideru (npr. 'imam jaja')\n• Po prehrani: vegan, vegetarijansko, bez glutena, niskokalorično\n\nPrimjeri: \"Daj mi nešto s čokoladom\", \"Treba mi nešto brzo i bez glutena\", \"Najbolje ocijenjeno\"\n\nAko želiš, mogu ti i reći nutritivne informacije recepta ili sortirati po ocjeni. Samo upiši svoje pitanje!"
         };
       
       case 'newest': {
@@ -739,10 +758,17 @@ const DiabetoChatbot: React.FC = () => {
       }
       
       case 'ingredient': {
-        const ingredient = extractIngredient(userMessage);
-        const normIngredient = normalizeText(ingredient);
+        // Try to detect multiple ingredients from the user's text and prefer recipes that
+        // contain all specified ingredients. If none, return grouped results for each ingredient.
+        const normText = normalizeText(userMessage);
 
-        // helper: generate stems/variants (same logic as in extractIngredient)
+        // Build token set from recipes (names + ingredients)
+        const recipesTokens = new Set<string>();
+        recipes.forEach(r => {
+          normalizeText(r.ime).split(/\W+/).forEach(t => { if (t.length >= 3) recipesTokens.add(t); });
+          r.sastojci.forEach(s => normalizeText(s).split(/\W+/).forEach(t => { if (t.length >= 3) recipesTokens.add(t); }));
+        });
+
         const stemsFor = (token: string) => {
           const stems = new Set<string>();
           stems.add(token);
@@ -762,58 +788,129 @@ const DiabetoChatbot: React.FC = () => {
           return Array.from(stems);
         };
 
-        const matchesIngredientInText = (text: string) => {
-          const normText = normalizeText(text);
-          const userStems = stemsFor(normIngredient);
-          const tokens = normText.split(/\W+/).filter(t => t.length >= 2);
-          
-          for (const t of tokens) {
-            const recipeStems = stemsFor(t);
-            // Check if any user stem matches any recipe stem
-            for (const us of userStems) {
-              for (const rs of recipeStems) {
-                if (us === rs) return true;
-              }
+        // Find which recipe tokens appear in the user's message
+        const foundIngredients: string[] = [];
+
+        // First, parse explicit lists like "imam gljive i rajčicu" or "imam gljive, rajčicu i jaja"
+        try {
+          const lower = userMessage.toLowerCase();
+          const explicit = lower.match(/(?:imam|imam li|imam:?)\s+([^?.!]+)/i);
+          if (explicit && explicit[1]) {
+            const listStr = explicit[1].split(/[?.!]/)[0];
+            const parts = listStr.split(/,| i | i, | i\.| i;/i).map(p => p.trim()).filter(Boolean);
+            for (const part of parts) {
+              const extracted = extractIngredient(part);
+              const normExtracted = normalizeText(extracted || part);
+              if (normExtracted && !foundIngredients.includes(normExtracted)) foundIngredients.push(normExtracted);
             }
+          }
+        } catch (e) {
+          // parsing failed, continue
+        }
+
+        // Then, also detect recipe tokens anywhere in the normalized text
+        for (const token of recipesTokens) {
+          const stems = stemsFor(token);
+          for (const s of stems) {
+            if (!s) continue;
+            if (normText.includes(s)) {
+              if (!foundIngredients.includes(token)) foundIngredients.push(token);
+            }
+          }
+        }
+
+        // Fallback to single-keyword heuristics if nothing found
+        if (foundIngredients.length === 0) {
+          const fallback = extractIngredient(userMessage);
+          const normFallback = normalizeText(fallback);
+          if (!normFallback) return { text: `Pokušaj unijeti sastojak ili pitanje (npr. "Imam gljive i rajčicu").` };
+          foundIngredients.push(normFallback);
+        }
+
+        const matchesTokenInRecipe = (r: Recipe, token: string) => {
+          const recipeText = normalizeText(r.ime) + ' ' + r.sastojci.map(s => normalizeText(s)).join(' ');
+          const stems = stemsFor(token);
+          for (const st of stems) {
+            if (!st) continue;
+            if (recipeText.includes(st)) return true;
           }
           return false;
         };
 
-        const matching = recipes.filter(r => {
-          if (matchesIngredientInText(r.ime)) return true;
-          if (r.sastojci.some(s => matchesIngredientInText(s))) return true;
-          return false;
-        });
+        // If user specified multiple ingredients, prefer AND matches
+        if (foundIngredients.length >= 2) {
+          const andMatches = recipes.filter(r => foundIngredients.every(tok => matchesTokenInRecipe(r, tok)));
+          if (andMatches.length > 0) {
+            const pretty = foundIngredients.join(' i ');
+            return {
+              text: `Pronašao sam recepte koji sadrže ${pretty}:`,
+              recipes: andMatches.slice(0, 4)
+            };
+          }
 
-        if (matching.length === 0) {
-          return { text: `Nažalost, nisam pronašao recepte s "${ingredient}". Probaj nešto drugo!` };
+          // If no recipe contains all ingredients, return grouped results per ingredient
+          const grouped: { token: string; list: Recipe[] }[] = [];
+          const uniqueResults: Recipe[] = [];
+          for (const tok of foundIngredients) {
+            const list = recipes.filter(r => matchesTokenInRecipe(r, tok));
+            grouped.push({ token: tok, list });
+            list.forEach(r => { if (!uniqueResults.find(u => u.id === r.id)) uniqueResults.push(r); });
+          }
+
+          const first = grouped[0];
+          const second = grouped[1];
+
+          // Try to suggest a sensible combined suggestion (e.g. a risotto) if a recipe
+          // contains one of the ingredients and also contains rice/riž- tokens.
+          let comboSuggestion: string | null = null;
+          for (const r of recipes) {
+            const name = normalizeText(r.ime);
+            const ingText = r.sastojci.map(s => normalizeText(s)).join(' ');
+            if ((name.includes('riz') || name.includes('rizo') || ingText.includes('riza') || ingText.includes('arborio')) && foundIngredients.some(tok => matchesTokenInRecipe(r, tok))) {
+              comboSuggestion = r.ime;
+              break;
+            }
+          }
+
+          const responseLines: string[] = [];
+          responseLines.push(`Nisam našao recepte koji sadrže sve navedene sastojke odjednom.`);
+          if (comboSuggestion) {
+            responseLines.push(`Možeš, primjerice, pripremiti "${comboSuggestion}" (ako imaš rižu i gljive) i poslužiti ga s rajčicom kao prilog.`);
+          }
+
+          // List grouped results per detected ingredient for clarity
+          if (first) {
+            responseLines.push(`
+Evo recepata koji sadrže "${first.token}":`);
+            if (first.list.length === 0) responseLines.push(`(Nema recepata s ${first.token})`);
+          }
+          if (second) {
+            responseLines.push(`
+Evo recepata koji sadrže "${second.token}":`);
+            if (second.list.length === 0) responseLines.push(`(Nema recepata s ${second.token})`);
+          }
+
+          return {
+            text: responseLines.join('\n'),
+            recipes: uniqueResults.slice(0, 6)
+          };
         }
 
-        const isChocolate = normIngredient.includes('cokolad');
-        const responseText = isChocolate ? 'Pronašao sam nešto čokoladno za tebe:' : `Evo recepata koji sadrže "${ingredient}":`;
+        // Single ingredient path
+        const single = foundIngredients[0];
+        const singleMatches = recipes.filter(r => matchesTokenInRecipe(r, single));
+        if (singleMatches.length === 0) {
+          return { text: `Nažalost, nisam pronašao recepte s "${single}". Probaj nešto drugo!` };
+        }
 
-        return {
-          text: responseText,
-          recipes: matching.slice(0, 3)
-        };
+        const isChocolate = single.includes('cokolad');
+        const responseText = isChocolate ? 'Pronašao sam nešto čokoladno za tebe:' : `Evo recepata koji sadrže "${single}":`;
+        return { text: responseText, recipes: singleMatches.slice(0, 4) };
       }
       
       case 'help':
         return {
-          text: `Mogu ti pomoći na više načina:\n
-📋 **Pretraživanje recepata:**
-• Po kategoriji (deserti, pasta, meso, riba, salate)
-• Po prehrani (vegan, bez glutena, vegetarijansko)
-• Po nutritivnim vrijednostima (niskokalorično, bogato proteinima)
-• Po sastojku ("Daj mi nešto s gljivama")
-
-⭐ **Ocjenjivanje i komentari:**
-Otvori bilo koji recept i možeš ga ocijeniti klikom na zvjezdice!
-
-🖼️ **Galerija:**
-Posjeti stranicu Galerija za pregled slika jela.
-
-Samo pitaj što te zanima!`
+          text: `Evo kratki vodič što sve mogu i kako me najbolje pitati:\n\n🔎 Pretraživanje recepata:\n• Po kategoriji: "Daj mi deserte" ili "pasta"\n• Po sastojku: "Imam tikvice i rajčicu" ili "s čokoladom"\n• Po prehrani: "Vegan" / "Bez glutena" / "Vegetarijanski"\n• Po nutritivnim željama: "više proteina", "malo ugljikohidrata", "nisko-kalorično"\n• Ako kažeš samo sastojak, pronaći ću recepte koji ga sadrže.\n\n⭐ Ostale mogućnosti:\n• Otvori recept i možeš ga ocijeniti ili ostaviti komentar\n• Posjeti Galeriju za slike jela\n\nAko želiš, napiši: "Što mogu tražiti?" ili probaj jedan od primjera iznad.`
         };
       
       case 'rate':
@@ -854,7 +951,7 @@ Samo pitaj što te zanima!`
         }
         
         return {
-          text: `Nisam siguran što tražiš. 🤔\n\nProbaj mi reći:\n• Koju vrstu jela želiš (desert, pasta, meso...)\n• Imaš li posebne prehrambene zahtjeve (vegan, bez glutena...)\n• Ili jednostavno "najnovije" ili "najbolje ocijenjeno"!`
+          text: `Nisam siguran što točno želiš — rado ću pomoći! 🤝\n\nPokušaj s jednim od ovih primjera:\n• "Daj mi nešto slatko"\n• "Imam piletinu i rižu"\n• "Pokaži najnovije"\n• "Trebam nešto bez glutena"\n\nTakođer možeš napisati samo sastojak (npr. "kava" ili "čokolada") i ja ću potražiti recepte koji ga koriste.`
         };
     }
   };
@@ -911,8 +1008,12 @@ Samo pitaj što te zanima!`
     }
   };
 
-  // Calculate rotation based on position - smooth rolling like a wheel
-  const rotation = (rollPosition / 2) % 360;
+  // Calculate realistic rotation: full rotation (360°) = circumference movement
+  // Diabeto diameter ~64px (w-16 h-16), so circumference ≈ 64 * π ≈ 201px
+  // Movement of 1px = 360 / 201 ≈ 1.79° rotation
+  const DIABETO_DIAMETER = 64;
+  const CIRCUMFERENCE = DIABETO_DIAMETER * Math.PI;
+  const rotation = (((rollPosition - -100) / CIRCUMFERENCE) * 360) % 360;
 
   return (
     <>
@@ -937,12 +1038,21 @@ Samo pitaj što te zanima!`
         <div
           className="fixed z-[60] bottom-6"
           style={{ 
-            left: rollPosition,
-            transform: `rotate(${rotation}deg)`,
+            transform: `translate3d(${rollPosition}px, 0, 0) rotate(${rotation}deg)`,
+            willChange: 'transform'
           }}
         >
-          <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-primary shadow-lg">
+          <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-primary">
             <img src={diabetoImage} alt="Dijabeto" className="w-full h-full object-cover" />
+          </div>
+        </div>
+      )}
+
+      {/* Roller utterance (breath) shown after rolling finishes */}
+      {rollerSpeech && !isOpen && (
+        <div className="fixed z-[61]" style={{ left: rollPosition + 36, bottom: 86 }}>
+          <div className="bg-white text-sm px-3 py-1 rounded-full border-2 border-primary shadow-md">
+            {rollerSpeech}
           </div>
         </div>
       )}
