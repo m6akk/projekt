@@ -7,8 +7,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Allow the ngrok host so external requests via the public tunnel are accepted
+    allowedHosts: ["unswollen-fuselike-yousef.ngrok-free.dev"],
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  // Plugins
+  // `componentTagger()` was removed since it's not defined/imported in this project.
+  plugins: [react()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
