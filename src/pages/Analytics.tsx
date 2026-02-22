@@ -14,16 +14,20 @@ import {
 } from '../services/googleAnalytics';
 import { AnalyticsData, PageViewData } from '../types/analytics';
 import { getStoredRecipes } from '@/hooks/useRecipeStorage';
-import { generateUserBasedRecommendations } from '@/utils/recommendations';
+import { generateSimilarRecipeRecommendations, cosineSimilarity, getRecipeFeatures } from '@/utils/recommendations';
+import { fetchUserInteractionsFromGA4, analyzeRecipeViewsFromGA4, calculateProfileFromGA4Views } from '@/services/ga4Recommendations';
+import { performFunnelAnalysis, generateFunnelInsights, FunnelStep } from '@/services/ga4Funnel';
+import { performRetentionAnalysis, generateRetentionInsights, RetentionSegment } from '@/services/ga4Retention';
 import RecipeRecommendationCards from '@/components/RecipeRecommendationCards';
 
 const Analytics: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userData, setUserData] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [pageViews, setPageViews] = useState<PageViewData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'recommendations' | 'funnel'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'recommendations' | 'funnel' | 'retention'>('dashboard');
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -32,8 +36,12 @@ const Analytics: React.FC = () => {
       
       if (hasAuth) {
         const storedUserData = sessionStorage.getItem('user_data');
+        const token = sessionStorage.getItem('google_access_token');
         if (storedUserData) {
           setUserData(JSON.parse(storedUserData));
+        }
+        if (token) {
+          setAccessToken(token);
         }
         setIsAuthenticated(true);
         await loadAnalyticsData();
@@ -65,6 +73,10 @@ const Analytics: React.FC = () => {
 
   const handleLoginSuccess = async (user: any) => {
     setUserData(user);
+    const token = sessionStorage.getItem('google_access_token');
+    if (token) {
+      setAccessToken(token);
+    }
     setIsAuthenticated(true);
     await loadAnalyticsData();
   };
@@ -74,6 +86,7 @@ const Analytics: React.FC = () => {
     sessionStorage.removeItem('token_expires');
     sessionStorage.removeItem('user_data');
     setIsAuthenticated(false);
+    setAccessToken(null);
     setUserData(null);
     setAnalyticsData(null);
   };
@@ -173,6 +186,16 @@ const Analytics: React.FC = () => {
             >
               📈 Analiza
             </button>
+            <button
+              className={`py-4 px-6 border-b-[3px] font-display text-sm uppercase transition-colors ${
+                activeTab === 'retention' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('retention')}
+            >
+              🔄 Vraćanja
+            </button>
           </div>
         </div>
       </div>
@@ -196,13 +219,145 @@ const Analytics: React.FC = () => {
         )}
 
         {activeTab === 'recommendations' && (
-          <RecommendationsTab />
+          <RecommendationsTab accessToken={accessToken} />
         )}
 
         {activeTab === 'funnel' && (
-          <FunnelAnalysisTab pageViews={pageViews} />
+          <FunnelAnalysisTab accessToken={accessToken} />
+        )}
+
+        {activeTab === 'retention' && (
+          <RetentionAnalysisTab accessToken={accessToken} />
         )}
       </main>
+    </div>
+  );
+};
+
+// Retention analysis tab component
+const RetentionAnalysisTab: React.FC<{ accessToken: string | null }> = ({ accessToken }) => {
+  const [retentionData, setRetentionData] = useState<RetentionSegment[]>([]);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadRetention() {
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const data = await performRetentionAnalysis(accessToken);
+        setRetentionData(data);
+        setInsights(generateRetentionInsights(data));
+      } catch (error) {
+        console.error('Error loading retention:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadRetention();
+  }, [accessToken]);
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">Učitavanje analize vraćanja...</p>
+      </div>
+    );
+  }
+
+  if (!accessToken) {
+    return (
+      <div className="text-center py-12 bg-white rounded-lg border-[3px] border-primary/20 p-8">
+        <p className="text-gray-600 text-lg">
+          🔄 Trebate biti prijavljeni za analizu vraćanja
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-white rounded-lg shadow-md p-6 border-[3px] border-primary/20">
+        <h2 className="text-xl font-display font-bold text-primary mb-6">
+          🔄 Analiza vraćanja korisnika
+        </h2>
+
+        {retentionData.length === 0 ? (
+          <p className="text-gray-600 text-center py-8">Nema dostupnih podataka</p>
+        ) : (
+          <div className="space-y-4">
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              {retentionData.map((segment) => (
+                <div key={segment.segment} className="bg-primary/10 rounded-lg p-4 border-l-4 border-primary">
+                  <h3 className="font-display font-bold text-primary mb-2">{segment.segment}</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Ukupno korisnika:</span>
+                      <span className="font-bold">{segment.totalUsers.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Novi korisnici:</span>
+                      <span className="font-bold text-blue-600">{segment.newUsers.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Vraćeni korisnici:</span>
+                      <span className="font-bold text-green-600">{segment.returningUsers.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t-2 border-primary/20">
+                      <span className="text-gray-700 font-bold">Stopa vraćanja:</span>
+                      <span className="font-bold text-primary text-lg">{segment.retentionRate.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Retention rate bars */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h3 className="font-ui font-bold text-gray-700 mb-4">Usporedba stopa vraćanja:</h3>
+              <div className="space-y-3">
+                {retentionData.map((segment) => (
+                  <div key={segment.segment}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-ui text-gray-700">{segment.segment}</span>
+                      <span className="text-sm font-bold text-primary">{segment.retentionRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded h-6">
+                      <div
+                        className="bg-gradient-to-r from-primary to-accent h-full rounded transition-all duration-500 flex items-center justify-end pr-2"
+                        style={{ width: `${Math.min(segment.retentionRate, 100)}%` }}
+                      >
+                        {segment.retentionRate > 10 && (
+                          <span className="text-white text-xs font-bold">{segment.retentionRate.toFixed(1)}%</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Insights */}
+      {insights.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6 border-[3px] border-secondary/20">
+          <h3 className="text-lg font-display font-bold text-foreground mb-4">💡 Uvidi</h3>
+          <div className="space-y-3">
+            {insights.map((insight, idx) => (
+              <div key={idx} className="p-3 bg-secondary/10 rounded-lg border-l-4 border-secondary">
+                <p className="text-sm font-ui text-gray-700">{insight}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -210,9 +365,70 @@ const Analytics: React.FC = () => {
 export default Analytics;
 
 // Recommendations tab component
-const RecommendationsTab: React.FC = () => {
+const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessToken }) => {
   const recipes = getStoredRecipes();
-  const recommendations = generateUserBasedRecommendations(recipes, 6);
+  const [recommendations, setRecommendations] = useState<Array<any>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadRecommendations() {
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // 1. Dohvati stvarne podatke iz GA4
+        const ga4Data = await fetchUserInteractionsFromGA4(accessToken);
+        if (!ga4Data) {
+          setLoading(false);
+          return;
+        }
+
+        // 2. Analiziraj koje recepte je korisnik gledao
+        const viewedRecipes = analyzeRecipeViewsFromGA4(ga4Data);
+
+        // 3. Generiraj profil na temelju stvarnih pregleda
+        const userProfile = calculateProfileFromGA4Views(viewedRecipes, recipes);
+
+        // 4. Izračunaj cosine similarity
+        const recs = recipes
+          .filter(r => !viewedRecipes.has(r.id)) // Ne preporučuj pregledane
+          .map(r => ({
+            ...r,
+            similarity: cosineSimilarity(userProfile, getRecipeFeatures(r))
+          }))
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 6);
+
+        setRecommendations(recs);
+      } catch (error) {
+        console.error('Error loading recommendations:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadRecommendations();
+  }, [accessToken, recipes]);
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">Učitavanje preporuka...</p>
+      </div>
+    );
+  }
+
+  if (!accessToken) {
+    return (
+      <div className="text-center py-12 bg-white rounded-lg border-[3px] border-primary/20 p-8">
+        <p className="text-gray-600 text-lg">
+          📚 Trebate biti prijavljeni za personalizirane preporuke
+        </p>
+      </div>
+    );
+  }
 
   if (recommendations.length === 0) {
     return (
@@ -231,8 +447,49 @@ const RecommendationsTab: React.FC = () => {
 };
 
 // Funnel analysis tab component  
-const FunnelAnalysisTab: React.FC<{ pageViews: PageViewData[] }> = ({ pageViews }) => {
-  const topPages = pageViews.slice(0, 6);
+const FunnelAnalysisTab: React.FC<{ accessToken: string | null }> = ({ accessToken }) => {
+  const [funnelData, setFunnelData] = useState<FunnelStep[]>([]);
+  const [insights, setInsights] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadFunnel() {
+      if (!accessToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const data = await performFunnelAnalysis(accessToken);
+        setFunnelData(data);
+        setInsights(generateFunnelInsights(data));
+      } catch (error) {
+        console.error('Error loading funnel:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadFunnel();
+  }, [accessToken]);
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">Učitavanje funnel analize...</p>
+      </div>
+    );
+  }
+
+  if (!accessToken) {
+    return (
+      <div className="text-center py-12 bg-white rounded-lg border-[3px] border-primary/20 p-8">
+        <p className="text-gray-600 text-lg">
+          📊 Trebate biti prijavljeni za analizu
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -240,43 +497,57 @@ const FunnelAnalysisTab: React.FC<{ pageViews: PageViewData[] }> = ({ pageViews 
         <h2 className="text-xl font-display font-bold text-primary mb-6">
           📊 Analiza koraka pretvaranja
         </h2>
-        
-        <div className="space-y-4">
-          {topPages.map((page, index) => {
-            const percentage = index === 0 ? 100 : Math.round((page.views / topPages[0].views) * 100);
-            
-            return (
-              <div key={page.name} className="space-y-2">
+
+        {funnelData.length === 0 ? (
+          <p className="text-gray-600 text-center py-8">Nema dostupnih podataka</p>
+        ) : (
+          <div className="space-y-6">
+            {funnelData.map((step, index) => (
+              <div key={step.id} className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-ui">
-                    <strong>Korak {index + 1}:</strong> {page.name}
+                    <strong>Korak {index + 1}:</strong> {step.name}
                   </span>
                   <span className="text-xs font-bold text-primary">
-                    {page.views} pregleda ({percentage}%)
+                    {step.users} korisnika ({step.conversionRate}%)
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded h-6 overflow-hidden">
+                <div className="w-full bg-gray-200 rounded h-8 overflow-hidden">
                   <div
-                    className="bg-gradient-to-r from-primary to-accent h-full rounded transition-all duration-500"
-                    style={{ width: `${percentage}%` }}
+                    className="bg-gradient-to-r from-primary to-accent h-full rounded transition-all duration-500 flex items-center justify-end pr-3"
+                    style={{ width: `${step.conversionRate}%` }}
                   >
-                    <span className="text-white text-xs font-bold flex items-center justify-end pr-2 h-full">
-                      {percentage > 20 ? `${percentage}%` : ''}
-                    </span>
+                    {step.conversionRate > 15 && (
+                      <span className="text-white text-xs font-bold">
+                        {step.conversionRate}%
+                      </span>
+                    )}
                   </div>
                 </div>
+                {step.dropOff > 0 && (
+                  <p className="text-xs text-red-600 font-ui">
+                    ↓ Drop-off: {step.dropOff}%
+                  </p>
+                )}
               </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-8 p-4 bg-secondary/20 rounded-lg border-[2px] border-secondary/50">
-          <p className="text-sm text-gray-700 font-ui">
-            <strong>Napomena:</strong> Ova analiza pokazuje najbolje pregledane stranice i stopu napuštanja
-            između njih. Veće razlike mezi koracima ukazuju na potrebu za optimizacijom korisničkog sučelja.
-          </p>
-        </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Insights */}
+      {insights.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6 border-[3px] border-secondary/20">
+          <h3 className="text-lg font-display font-bold text-foreground mb-4">💡 Uvidi</h3>
+          <div className="space-y-3">
+            {insights.map((insight, idx) => (
+              <div key={idx} className="p-3 bg-secondary/10 rounded-lg border-l-4 border-secondary">
+                <p className="text-sm font-ui text-gray-700">{insight}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
