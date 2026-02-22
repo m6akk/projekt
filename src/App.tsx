@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import DiabetoChatbot from "./components/DiabetoChatbot";
 import SplashScreen from "./components/SplashScreen";
 import ScrollToTop from "./components/ScrollToTop";
+import Analytics from './pages/Analytics';
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,7 @@ const App = () => {
               <Route path="/galerija" element={<Galerija />} />
               <Route path="/about" element={<About />} />
               <Route path="/kontakt" element={<Kontakt />} />
+              <Route path="/analytics" element={<Analytics />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
