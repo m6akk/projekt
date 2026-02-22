@@ -91,22 +91,26 @@ const Analytics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Back button (top-left) */}
-      <div className="fixed top-4 left-4 z-50">
-        <a href="/" className="cartoon-button bg-accent text-accent-foreground px-4 py-2 inline-flex items-center shadow-card">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0L3.586 10l4.707-4.707a1 1 0 011.414 1.414L6.414 10l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            <path fillRule="evenodd" d="M13 15a1 1 0 100-2h-1a1 1 0 100 2h1z" clipRule="evenodd" />
-          </svg>
-          Nazad
-        </a>
-      </div>
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
+      {/* Navigation - fixed at top with centered back button */}
+      <nav className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-xl font-semibold text-gray-800">Analytics Dashboard</h1>
-            
+          <div className="relative flex justify-between h-16 items-center">
+            <div />
+
+            {/* Centered back button in nav */}
+            <div className="absolute left-1/2 transform -translate-x-1/2">
+              <button
+                onClick={() => window.history.length > 1 ? window.history.back() : window.location.href = '/'}
+                className="cartoon-button bg-primary text-primary-foreground px-4 py-2 inline-flex items-center shadow-card"
+                aria-label="Nazad"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0L3.586 10l4.707-4.707a1 1 0 011.414 1.414L6.414 10l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+                Nazad
+              </button>
+            </div>
+
             {userData && (
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -131,8 +135,8 @@ const Analytics: React.FC = () => {
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content (pad top to account for fixed nav) */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
         <KPICards data={analyticsData} />
 
         {/* Charts Grid */}
