@@ -13,6 +13,9 @@ import {
   fetchUserInfo 
 } from '../services/googleAnalytics';
 import { AnalyticsData, PageViewData } from '../types/analytics';
+import { getStoredRecipes } from '@/hooks/useRecipeStorage';
+import { generateUserBasedRecommendations } from '@/utils/recommendations';
+import RecipeRecommendationCards from '@/components/RecipeRecommendationCards';
 
 const Analytics: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -20,6 +23,7 @@ const Analytics: React.FC = () => {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [pageViews, setPageViews] = useState<PageViewData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'recommendations' | 'funnel'>('dashboard');
 
   useEffect(() => {
     // Check if user is already authenticated
@@ -135,23 +139,144 @@ const Analytics: React.FC = () => {
         </div>
       </nav>
 
-      {/* Main Content (pad top to account for fixed nav) */}
+      {/* Tabovi */}
+      <div className="bg-white border-b-[3px] border-primary sticky top-16 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-1 overflow-x-auto">
+            <button
+              className={`py-4 px-6 border-b-[3px] font-display text-sm uppercase transition-colors ${
+                activeTab === 'dashboard' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              📊 Nadzorna ploča
+            </button>
+            <button
+              className={`py-4 px-6 border-b-[3px] font-display text-sm uppercase transition-colors ${
+                activeTab === 'recommendations' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('recommendations')}
+            >
+              🍽️ Preporuke
+            </button>
+            <button
+              className={`py-4 px-6 border-b-[3px] font-display text-sm uppercase transition-colors ${
+                activeTab === 'funnel' 
+                  ? 'border-primary text-primary' 
+                  : 'border-transparent text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('funnel')}
+            >
+              📈 Analiza
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Glavni sadržaj */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
-        <KPICards data={analyticsData} />
+        {activeTab === 'dashboard' && (
+          <>
+            <KPICards data={analyticsData} />
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <DeviceChart data={analyticsData.deviceData} />
-          <UsersTimeChart data={analyticsData.dailyUsers} />
-        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <DeviceChart data={analyticsData.deviceData} />
+              <UsersTimeChart data={analyticsData.dailyUsers} />
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <PagesChart data={pageViews} />
-          <TrafficChart data={analyticsData.sourceData} />
-        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <PagesChart data={pageViews} />
+              <TrafficChart data={analyticsData.sourceData} />
+            </div>
+          </>
+        )}
+
+        {activeTab === 'recommendations' && (
+          <RecommendationsTab />
+        )}
+
+        {activeTab === 'funnel' && (
+          <FunnelAnalysisTab pageViews={pageViews} />
+        )}
       </main>
     </div>
   );
 };
 
 export default Analytics;
+
+// Recommendations tab component
+const RecommendationsTab: React.FC = () => {
+  const recipes = getStoredRecipes();
+  const recommendations = generateUserBasedRecommendations(recipes, 6);
+
+  if (recommendations.length === 0) {
+    return (
+      <div className="text-center py-12 bg-white rounded-lg border-[3px] border-primary/20 p-8">
+        <p className="text-gray-600 text-lg mb-4">
+          📚 Nema dovoljno podataka za personalizirane preporuke
+        </p>
+        <p className="text-gray-500 text-sm">
+          Pregledom recepata sustav će bolje razumjeti vaše preferencije i ponuditi bolje preporuke.
+        </p>
+      </div>
+    );
+  }
+
+  return <RecipeRecommendationCards recommendations={recommendations} />;
+};
+
+// Funnel analysis tab component  
+const FunnelAnalysisTab: React.FC<{ pageViews: PageViewData[] }> = ({ pageViews }) => {
+  const topPages = pageViews.slice(0, 6);
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-white rounded-lg shadow-md p-6 border-[3px] border-primary/20">
+        <h2 className="text-xl font-display font-bold text-primary mb-6">
+          📊 Analiza koraka pretvaranja
+        </h2>
+        
+        <div className="space-y-4">
+          {topPages.map((page, index) => {
+            const percentage = index === 0 ? 100 : Math.round((page.views / topPages[0].views) * 100);
+            
+            return (
+              <div key={page.name} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-ui">
+                    <strong>Korak {index + 1}:</strong> {page.name}
+                  </span>
+                  <span className="text-xs font-bold text-primary">
+                    {page.views} pregleda ({percentage}%)
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded h-6 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-primary to-accent h-full rounded transition-all duration-500"
+                    style={{ width: `${percentage}%` }}
+                  >
+                    <span className="text-white text-xs font-bold flex items-center justify-end pr-2 h-full">
+                      {percentage > 20 ? `${percentage}%` : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-8 p-4 bg-secondary/20 rounded-lg border-[2px] border-secondary/50">
+          <p className="text-sm text-gray-700 font-ui">
+            <strong>Napomena:</strong> Ova analiza pokazuje najbolje pregledane stranice i stopu napuštanja
+            između njih. Veće razlike mezi koracima ukazuju na potrebu za optimizacijom korisničkog sučelja.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -8,8 +8,10 @@ import StarRating from "@/components/StarRating";
 import NutritionChart from "@/components/NutritionChart";
 import IngredientList from "@/components/IngredientList";
 import CommentSection from "@/components/CommentSection";
+import RecipeRecommendationCards from "@/components/RecipeRecommendationCards";
 import { Clock, ChefHat, Users, Calendar, ArrowLeft, Leaf, Wheat } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { generateSimilarRecipeRecommendations } from "@/utils/recommendations";
 
 // Recipe images mapping
 const recipeImages: Record<number, string> = {
@@ -30,6 +32,7 @@ const recipeImages: Record<number, string> = {
 const RecipeDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recommendations, setRecommendations] = useState<Array<Recipe & { similarity: number }>>([]);
 
   useEffect(() => {
     if (id) {
@@ -37,6 +40,10 @@ const RecipeDetail = () => {
       const foundRecipe = recipes.find(r => r.id === parseInt(id));
       if (foundRecipe) {
         setRecipe({ ...foundRecipe });
+        
+        // Generate similar recipe recommendations
+        const similar = generateSimilarRecipeRecommendations(foundRecipe, recipes, 3);
+        setRecommendations(similar);
       }
     }
   }, [id]);
@@ -220,9 +227,16 @@ const RecipeDetail = () => {
         </div>
 
         {/* Comments */}
-        <div className="bg-card border border-border rounded-xl p-6 shadow-soft">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-soft mb-12">
           <CommentSection komentari={recipe.komentari} onAddComment={handleAddComment} />
         </div>
+
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
+          <div className="mb-12">
+            <RecipeRecommendationCards recommendations={recommendations} />
+          </div>
+        )}
       </main>
 
       {/* Interactive Footer */}
