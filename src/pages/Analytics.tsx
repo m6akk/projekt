@@ -502,35 +502,49 @@ const FunnelAnalysisTab: React.FC<{ accessToken: string | null }> = ({ accessTok
           <p className="text-gray-600 text-center py-8">Nema dostupnih podataka</p>
         ) : (
           <div className="space-y-6">
-            {funnelData.map((step, index) => (
-              <div key={step.id} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-ui">
-                    <strong>Korak {index + 1}:</strong> {step.name}
-                  </span>
-                  <span className="text-xs font-bold text-primary">
-                    {step.users} korisnika ({step.conversionRate}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded h-8 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-primary to-accent h-full rounded transition-all duration-500 flex items-center justify-end pr-3"
-                    style={{ width: `${step.conversionRate}%` }}
-                  >
-                    {step.conversionRate > 15 && (
-                      <span className="text-white text-xs font-bold">
-                        {step.conversionRate}%
+            {(() => {
+              const firstStepUsers = funnelData[0]?.users || 1;
+              return funnelData.map((step, index) => {
+                // Clamp percentage to max 100% to avoid impossible >100% visuals
+                const percentage = Math.min(
+                  Math.round((step.users / Math.max(firstStepUsers, 1)) * 100),
+                  100
+                );
+
+                // If dropOff is negative (increase), show as 0% drop-off
+                const dropOff = step.dropOff && step.dropOff > 0 ? step.dropOff : 0;
+
+                return (
+                  <div key={step.id} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-ui">
+                        <strong>Korak {index + 1}:</strong> {step.name}
                       </span>
+                      <span className="text-xs font-bold text-primary">
+                        {step.users} korisnika ({percentage}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded h-8 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-primary to-accent h-full rounded transition-all duration-500 flex items-center justify-end pr-3"
+                        style={{ width: `${percentage}%` }}
+                      >
+                        {percentage > 15 && (
+                          <span className="text-white text-xs font-bold">
+                            {percentage}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {dropOff > 0 && (
+                      <p className="text-xs text-red-600 font-ui">
+                        ↓ Drop-off: {dropOff}%
+                      </p>
                     )}
                   </div>
-                </div>
-                {step.dropOff > 0 && (
-                  <p className="text-xs text-red-600 font-ui">
-                    ↓ Drop-off: {step.dropOff}%
-                  </p>
-                )}
-              </div>
-            ))}
+                );
+              });
+            })()}
           </div>
         )}
       </div>

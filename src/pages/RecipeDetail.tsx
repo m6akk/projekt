@@ -231,12 +231,7 @@ const RecipeDetail = () => {
           <CommentSection komentari={recipe.komentari} onAddComment={handleAddComment} />
         </div>
 
-        {/* Recommendations */}
-        {recommendations.length > 0 && (
-          <div className="mb-12">
-            <RecipeRecommendationCards recommendations={recommendations} showBadge={false} showSimilarity={false} />
-          </div>
-        )}
+        {/* Recommendations removed per request - no user-level recommendations shown on recipe detail */}
       </main>
 
       {/* Interactive Footer */}
