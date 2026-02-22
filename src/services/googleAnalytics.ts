@@ -226,7 +226,8 @@ export const fetchPageViewsData = async (): Promise<PageViewData[]> => {
 
   const requestBody = {
     dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
-    dimensions: [{ name: 'pageTitle' }],
+    // Include both pageTitle and pagePath so we can show human titles and unique paths
+    dimensions: [{ name: 'pageTitle' }, { name: 'pagePath' }],
     metrics: [{ name: 'screenPageViews' }],
     orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
     limit: 10
@@ -247,7 +248,7 @@ export const fetchPageViewsData = async (): Promise<PageViewData[]> => {
     if (!response.ok || !data.rows) return [];
 
     return data.rows.map((row: any) => ({
-      name: row.dimensionValues[0]?.value || 'Unknown',
+      name: `${row.dimensionValues[0]?.value || 'Unknown'} (${row.dimensionValues[1]?.value || '/'})`,
       views: parseInt(row.metricValues[0]?.value) || 0
     }));
   } catch (error) {

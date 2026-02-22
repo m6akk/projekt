@@ -91,6 +91,16 @@ const Analytics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Back button (top-left) */}
+      <div className="fixed top-4 left-4 z-50">
+        <a href="/" className="cartoon-button bg-accent text-accent-foreground px-4 py-2 inline-flex items-center shadow-card">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0L3.586 10l4.707-4.707a1 1 0 011.414 1.414L6.414 10l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M13 15a1 1 0 100-2h-1a1 1 0 100 2h1z" clipRule="evenodd" />
+          </svg>
+          Nazad
+        </a>
+      </div>
       {/* Navigation */}
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

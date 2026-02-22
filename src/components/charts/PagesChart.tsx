@@ -30,8 +30,9 @@ const PagesChart: React.FC<PagesChartProps> = ({ data }) => {
       {
         label: 'Pregledi',
         data: data.map(d => d.views),
-        backgroundColor: 'rgba(21, 110, 161, 0.8)',
-        borderColor: 'rgba(21, 110, 161, 1)',
+        // Use site accent (yellow) from CSS variables so charts match site style
+        backgroundColor: 'hsl(var(--accent))',
+        borderColor: 'hsl(var(--accent))',
         borderWidth: 1,
       },
     ],

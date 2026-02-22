@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { initGoogleAuth, handleTokenResponse, fetchUserInfo } from '../../services/googleAnalytics';
 
 interface GoogleLoginProps {
@@ -7,6 +8,7 @@ interface GoogleLoginProps {
 
 const GoogleLogin: React.FC<GoogleLoginProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async () => {
     setLoading(true);
@@ -31,13 +33,26 @@ const GoogleLogin: React.FC<GoogleLoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      {/* Back button top-left */}
+      <div className="fixed top-4 left-4 z-50">
+        <button
+          onClick={() => navigate(-1)}
+          className="cartoon-button bg-accent text-accent-foreground px-4 py-2 inline-flex items-center shadow-card"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0L3.586 10l4.707-4.707a1 1 0 011.414 1.414L6.414 10l3.293 3.293a1 1 0 010 1.414z" clipRule="evenodd" />
+          </svg>
+          Nazad
+        </button>
+      </div>
+
       <div className="max-w-md w-full space-y-8 p-10 bg-white rounded-xl shadow-lg">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Analytics Dashboard
+            Analitika
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Prijavite se s Google računom za pristup analitici
+            Prijavite se s Google računom za pristup analitičkim podacima
           </p>
         </div>
         <div>

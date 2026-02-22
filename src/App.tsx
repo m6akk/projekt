@@ -15,6 +15,7 @@ import DiabetoChatbot from "./components/DiabetoChatbot";
 import SplashScreen from "./components/SplashScreen";
 import ScrollToTop from "./components/ScrollToTop";
 import Analytics from './pages/Analytics';
+import { useLocation } from 'react-router-dom';
 
 const queryClient = new QueryClient();
 
@@ -72,7 +73,8 @@ const App = () => {
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <DiabetoChatbot />
+            {/* Show chatbot on all pages except analytics */}
+            <ChatbotVisibility />
           </BrowserRouter>
         </div>
       </TooltipProvider>
@@ -81,3 +83,14 @@ const App = () => {
 };
 
 export default App;
+
+// Separate component so hooks can use router context
+const ChatbotVisibility: React.FC = () => {
+  const location = useLocation();
+  const hideOn = ['/analytics'];
+  const shouldHide = hideOn.some(p => location.pathname.startsWith(p));
+
+  if (shouldHide) return null;
+
+  return <DiabetoChatbot />;
+};
