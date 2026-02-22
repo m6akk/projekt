@@ -42,10 +42,15 @@ const UsersTimeChart: React.FC<UsersTimeChartProps> = ({ data }) => {
       {
         label: 'Korisnici',
         data: data.map(d => d.users),
-        borderColor: 'rgba(21, 110, 161, 1)',
-        backgroundColor: 'rgba(21, 110, 161, 0.1)',
+        borderColor: 'rgba(21, 110, 161, 0.95)',      // Primary blue
+        backgroundColor: 'rgba(21, 110, 161, 0.15)',  // Light blue fill
         fill: true,
         tension: 0.4,
+        borderWidth: 3,
+        pointBackgroundColor: 'rgba(255, 205, 86, 0.9)',  // Yellow points
+        pointBorderColor: 'rgba(21, 110, 161, 1)',
+        pointBorderWidth: 2,
+        pointRadius: 4,
       },
     ],
   };
@@ -60,9 +65,8 @@ const UsersTimeChart: React.FC<UsersTimeChartProps> = ({ data }) => {
       title: {
         display: true,
         text: 'Korisnici kroz vrijeme (zadnjih 30 dana)',
-        font: {
-          size: 16,
-        },
+        font: { size: 16, weight: 'bold' as const },
+        color: '#333'
       },
     },
     scales: {
@@ -76,7 +80,7 @@ const UsersTimeChart: React.FC<UsersTimeChartProps> = ({ data }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 h-80">
+    <div className="bg-white rounded-lg shadow-md p-6 h-80 border-[3px] border-primary/20">
       <Line data={chartData} options={options} />
     </div>
   );

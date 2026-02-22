@@ -11,14 +11,14 @@ interface TrafficChartProps {
 const TrafficChart: React.FC<TrafficChartProps> = ({ data }) => {
   const sources = Object.entries(data);
   
-  // Generate colors
+  // Family Guy color palette: alternating blue and yellow tones
   const colors = [
-    'rgba(21, 110, 161, 0.8)',
-    'rgba(51, 151, 208, 0.8)',
-    'rgba(74, 163, 216, 0.8)',
-    'rgba(102, 178, 224, 0.8)',
-    'rgba(130, 193, 232, 0.8)',
-    'rgba(158, 208, 240, 0.8)',
+    'rgba(21, 110, 161, 0.85)',   // Primary blue
+    'rgba(255, 205, 86, 0.85)',   // Yellow
+    'rgba(51, 151, 208, 0.85)',   // Light blue
+    'rgba(255, 193, 7, 0.85)',    // Gold
+    'rgba(21, 110, 161, 0.7)',    // Darker blue
+    'rgba(255, 205, 86, 0.7)',    // Darker yellow
   ];
 
   const chartData = {
@@ -27,6 +27,7 @@ const TrafficChart: React.FC<TrafficChartProps> = ({ data }) => {
       {
         data: sources.map(([, value]) => value),
         backgroundColor: colors.slice(0, sources.length),
+        borderColor: colors.slice(0, sources.length),
         borderWidth: 2,
       },
     ],
@@ -42,15 +43,14 @@ const TrafficChart: React.FC<TrafficChartProps> = ({ data }) => {
       title: {
         display: true,
         text: 'Izvori prometa',
-        font: {
-          size: 16,
-        },
+        font: { size: 16, weight: 'bold' as const },
+        color: '#333'
       },
     },
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 h-80">
+    <div className="bg-white rounded-lg shadow-md p-6 h-80 border-[3px] border-primary/20">
       <Pie data={chartData} options={options} />
     </div>
   );
