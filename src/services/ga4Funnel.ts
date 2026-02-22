@@ -43,14 +43,20 @@ export async function performFunnelAnalysis(accessToken: string): Promise<Funnel
 
     try {
       const stepData = await fetchStepData(baseUrl, accessToken, step);
-      
+
       const prevStep = i > 0 ? funnelResults[i - 1] : null;
+      // Drop-off is relative to the previous step
       const dropOff = prevStep && prevStep.users > 0
         ? ((prevStep.users - stepData.users) / prevStep.users) * 100
         : 0;
-      const conversionRate = prevStep && prevStep.users > 0
-        ? ((stepData.users / prevStep.users) * 100)
+
+      // Conversion rate should be relative to the FIRST funnel step, not the previous
+      const firstStepUsers = funnelResults.length > 0 ? funnelResults[0].users : stepData.users;
+      const conversionRateRaw = firstStepUsers > 0
+        ? ((stepData.users / firstStepUsers) * 100)
         : 100;
+
+      const conversionRate = Math.min(conversionRateRaw, 100);
 
       funnelResults.push({
         ...step,
