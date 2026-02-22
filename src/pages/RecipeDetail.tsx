@@ -234,7 +234,7 @@ const RecipeDetail = () => {
         {/* Recommendations */}
         {recommendations.length > 0 && (
           <div className="mb-12">
-            <RecipeRecommendationCards recommendations={recommendations} />
+            <RecipeRecommendationCards recommendations={recommendations} showBadge={false} showSimilarity={false} />
           </div>
         )}
       </main>

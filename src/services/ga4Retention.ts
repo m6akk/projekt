@@ -43,6 +43,7 @@ export async function performRetentionAnalysis(accessToken: string): Promise<Ret
     }
 
     const data = await response.json();
+    console.log('[ga4Retention] GA4 response:', data);
     
     // Agregacija po segmentima
     const segments: Record<string, {
@@ -57,7 +58,8 @@ export async function performRetentionAnalysis(accessToken: string): Promise<Ret
     };
 
     data.rows?.forEach((row: any) => {
-      const userType = row.dimensionValues[0]?.value || 'new'; // 'new' | 'returning'
+      console.log('[ga4Retention] row:', row);
+      const userType = row.dimensionValues[0]?.value || 'new'; // may be 'new' | 'returning' or localized labels
       const device = row.dimensionValues[1]?.value || 'desktop';
       const users = parseInt(row.metricValues[0]?.value) || 0;
 

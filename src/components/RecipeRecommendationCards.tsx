@@ -6,10 +6,14 @@ import { Link } from 'react-router-dom';
 
 interface RecipeRecommendationCardsProps {
   recommendations: Array<Recipe & { similarity: number }>;
+  showBadge?: boolean;
+  showSimilarity?: boolean;
 }
 
 const RecipeRecommendationCards: React.FC<RecipeRecommendationCardsProps> = ({
   recommendations,
+  showBadge = true,
+  showSimilarity = true
 }) => {
   if (recommendations.length === 0) {
     return (
@@ -39,14 +43,24 @@ const RecipeRecommendationCards: React.FC<RecipeRecommendationCardsProps> = ({
               className="no-underline hover:no-underline"
             >
               <Card className="h-full hover:shadow-lg transition-all duration-200 border-[3px] border-primary/20 cursor-pointer">
+                {/* Image */}
+                <img
+                  src={recipe.slika || (`https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=500&fit=crop&auto=format&q=60&ixlib=rb-${(recipe.id%10)+1}`)}
+                  alt={recipe.ime}
+                  className="w-full h-40 object-cover rounded-t-lg"
+                />
                 <CardHeader>
                   <div className="flex justify-between items-start mb-2">
-                    <Badge className="bg-accent text-accent-foreground">
-                      #{index + 1} Preporuka
-                    </Badge>
-                    <span className="text-xs font-bold text-primary">
-                      {similarityPercent}% podudaranja
-                    </span>
+                    {showBadge && (
+                      <Badge className="bg-accent text-accent-foreground">
+                        #{index + 1} Preporuka
+                      </Badge>
+                    )}
+                    {showSimilarity && (
+                      <span className="text-xs font-bold text-primary">
+                        {similarityPercent}% podudaranja
+                      </span>
+                    )}
                   </div>
                   <CardTitle className="text-lg">{recipe.ime}</CardTitle>
                 </CardHeader>

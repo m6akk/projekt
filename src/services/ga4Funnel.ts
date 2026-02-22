@@ -14,11 +14,22 @@ export interface FunnelStep {
 /**
  * ✅ PRAVA FUNNEL ANALIZA S DEFINIRANIM KORACIMA
  */
-const FUNNEL_STEPS = [
-  { id: 'homepage', name: 'Početna stranica', path: '/', pathRegex: /^\/$/ },
-  { id: 'recipes', name: 'Popis recepata', path: '/recepti', pathRegex: /^\/recepti.*/ },
-  { id: 'recipe_detail', name: 'Detalji recepta', path: '/recept/:id', pathRegex: /^\/recept\/\d+.*/ },
-  { id: 'contact', name: 'Kontakt', path: '/kontakt', pathRegex: /^\/kontakt.*/ }
+// Use matchType/value pairs instead of brittle full-regexes.
+// Homepage: exact '/'
+// Recipes list: contains '/recepti'
+// Recipe detail: contains '/recept/' (matches /recept/1, /recept/23 etc.)
+// Contact: contains '/kontakt'
+const FUNNEL_STEPS: Array<{
+  id: string;
+  name: string;
+  path: string;
+  matchType: 'EXACT' | 'CONTAINS' | 'BEGINS_WITH' | 'FULL_REGEX';
+  value: string;
+}> = [
+  { id: 'homepage', name: 'Početna stranica', path: '/', matchType: 'EXACT', value: '/' },
+  { id: 'recipes', name: 'Popis recepata', path: '/recepti', matchType: 'CONTAINS', value: '/recepti' },
+  { id: 'recipe_detail', name: 'Detalji recepta', path: '/recept/:id', matchType: 'CONTAINS', value: '/recept/' },
+  { id: 'contact', name: 'Kontakt', path: '/kontakt', matchType: 'CONTAINS', value: '/kontakt' }
 ];
 
 export async function performFunnelAnalysis(accessToken: string): Promise<FunnelStep[]> {
@@ -64,7 +75,8 @@ async function fetchStepData(
   accessToken: string,
   step: typeof FUNNEL_STEPS[0]
 ): Promise<{ users: number; sessions: number }> {
-  const requestBody = {
+  // Build stringFilter using the step's matchType/value
+  const requestBody: any = {
     dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
     dimensions: [{ name: 'pagePath' }],
     metrics: [
@@ -75,12 +87,16 @@ async function fetchStepData(
       filter: {
         fieldName: 'pagePath',
         stringFilter: {
-          matchType: 'FULL_REGEX',
-          value: step.pathRegex?.source || step.path
+          matchType: step.matchType,
+          value: step.value
         }
       }
     }
   };
+
+  // Helpful debug logs to inspect what GA4 returns for each step
+  console.log('[ga4Funnel] Fetching step:', step.id, step.name);
+  console.log('[ga4Funnel] Request body:', JSON.stringify(requestBody));
 
   try {
     const response = await fetch(baseUrl, {
@@ -93,17 +109,22 @@ async function fetchStepData(
     });
 
     if (!response.ok) {
+      const txt = await response.text();
+      console.error('[ga4Funnel] GA4 error response:', response.status, txt);
       throw new Error(`GA4 API error: ${response.status}`);
     }
 
     const data = await response.json();
-    
+    console.log(`[ga4Funnel] GA4 response for ${step.id}:`, data);
+
     let totalUsers = 0;
     let totalSessions = 0;
 
     data.rows?.forEach((row: any) => {
-      totalUsers += parseInt(row.metricValues[0]?.value) || 0;
-      totalSessions += parseInt(row.metricValues[1]?.value) || 0;
+      // dimensionValues[0] should be pagePath
+      console.log('[ga4Funnel] row pagePath:', row.dimensionValues?.[0]?.value, 'metrics:', row.metricValues);
+      totalUsers += parseInt(row.metricValues?.[0]?.value) || 0;
+      totalSessions += parseInt(row.metricValues?.[1]?.value) || 0;
     });
 
     return { users: totalUsers, sessions: totalSessions };
