@@ -111,14 +111,27 @@ export function generateUserBasedRecommendationsExcludingViewed(
   viewedRecipeIds: Set<number>,
   limit: number = 6
 ): Array<Recipe & { similarity: number }> {
-  const recommendations = allRecipes
-    .filter((r) => !viewedRecipeIds.has(r.id)) // Isključi pregledane
-    .map((r) => ({
+  console.log('[recommendations] Starting generateUserBasedRecommendationsExcludingViewed');
+  console.log('[recommendations] User profile:', userProfile);
+  console.log('[recommendations] Total recipes:', allRecipes.length);
+  console.log('[recommendations] Viewed IDs:', viewedRecipeIds);
+  
+  const unviewed = allRecipes.filter((r) => !viewedRecipeIds.has(r.id));
+  console.log('[recommendations] Unviewed recipes count:', unviewed.length);
+  
+  const mapped = unviewed.map((r) => {
+    const similarity = cosineSimilarity(userProfile, getRecipeFeatures(r));
+    console.log(`[recommendations] Recipe ${r.id} (${r.ime}): similarity = ${similarity.toFixed(3)}`);
+    return {
       ...r,
-      similarity: cosineSimilarity(userProfile, getRecipeFeatures(r)),
-    }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, limit);
+      similarity,
+    };
+  });
+  
+  const sorted = mapped.sort((a, b) => b.similarity - a.similarity);
+  const recommendations = sorted.slice(0, limit);
+  
+  console.log('[recommendations] Final recommendations count:', recommendations.length);
 
   return recommendations;
 }

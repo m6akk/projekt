@@ -382,23 +382,39 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
       }
 
       try {
+        console.log('[RecommendationsTab] Starting to load recommendations');
+        
         // 1. Dohvati stvarne podatke iz GA4
         const ga4Data = await fetchUserInteractionsFromGA4(accessToken);
+        console.log('[RecommendationsTab] GA4 data received, rows:', ga4Data?.rows?.length);
+        
         if (!ga4Data) {
+          console.warn('[RecommendationsTab] No GA4 data returned');
           setLoading(false);
           return;
         }
 
         // 2. Analiziraj koje recepte je korisnik gledao
         const viewedRecipes = analyzeRecipeViewsFromGA4(ga4Data);
+        console.log('[RecommendationsTab] Viewed recipes count:', viewedRecipes.size);
+        
+        if (viewedRecipes.size === 0) {
+          console.warn('[RecommendationsTab] No recipe views found');
+          setLoading(false);
+          return;
+        }
 
         // 3. Generiraj profil na temelju stvarnih pregleda
         const userProfile = calculateProfileFromGA4Views(viewedRecipes, recipes);
+        console.log('[RecommendationsTab] User profile calculated:', userProfile);
 
         // 4. Pretvori Map u Set kako bi ga mogao koristiti recommendation funkcija
         const viewedSet = new Set(viewedRecipes.keys());
 
         // 5. Generiraj preporuke koristeći GA4 profil, ali isključi pregledane recepte
+        console.log('[RecommendationsTab] Total recipes available:', recipes.length);
+        console.log('[RecommendationsTab] Viewed recipes:', Array.from(viewedSet));
+        
         const recs = generateUserBasedRecommendationsExcludingViewed(
           userProfile,
           recipes,
@@ -406,9 +422,10 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
           6
         );
 
+        console.log('[RecommendationsTab] Recommendations generated:', recs.length);
         setRecommendations(recs);
       } catch (error) {
-        console.error('Error loading recommendations:', error);
+        console.error('[RecommendationsTab] Error loading recommendations:', error);
       } finally {
         setLoading(false);
       }

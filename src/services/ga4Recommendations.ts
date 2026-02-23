@@ -58,18 +58,27 @@ export function analyzeRecipeViewsFromGA4(ga4Data: any): Map<number, {
   events: number;
 }> {
   const recipeViews = new Map();
+  
+  console.log('[ga4Recommendations] analyzeRecipeViewsFromGA4 start, rows:', ga4Data?.rows?.length);
 
-  ga4Data?.rows?.forEach((row: any) => {
+  ga4Data?.rows?.forEach((row: any, idx: number) => {
     const pagePath = row.dimensionValues[0]?.value || '';
+    console.log(`[ga4Recommendations] Row ${idx}: ${pagePath}`);
+    
     const recipeIdMatch = pagePath.match(/\/recept\/(\d+)/);
     
-    if (!recipeIdMatch) return;
+    if (!recipeIdMatch) {
+      console.log(`[ga4Recommendations] Row ${idx} not a recipe path`);
+      return;
+    }
 
     const recipeId = parseInt(recipeIdMatch[1]);
     const views = parseInt(row.metricValues[0]?.value) || 0;
     const duration = parseFloat(row.metricValues[1]?.value) || 0;
     const engaged = parseInt(row.metricValues[2]?.value) || 0;
     const events = parseInt(row.metricValues[3]?.value) || 0;
+
+    console.log(`[ga4Recommendations] Found recipe ${recipeId} with ${views} views`);
 
     const existing = recipeViews.get(recipeId) || { views: 0, duration: 0, engaged: 0, events: 0 };
     recipeViews.set(recipeId, {
@@ -80,6 +89,8 @@ export function analyzeRecipeViewsFromGA4(ga4Data: any): Map<number, {
     });
   });
 
+  console.log('[ga4Recommendations] Total recipes found:', recipeViews.size);
+  console.log('[ga4Recommendations] Recipe IDs:', Array.from(recipeViews.keys()));
   return recipeViews;
 }
 
