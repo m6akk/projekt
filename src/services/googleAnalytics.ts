@@ -18,27 +18,34 @@ declare global {
 let accessToken: string | null = null;
 
 /**
- * Inicijalizacija Google auth-a
+ * Inicijalizacija Google auth-a s popup dialogom
  */
 export const initGoogleAuth = (callback: (response: any) => void) => {
   return new Promise((resolve, reject) => {
     // Provjeri da li je Google Identity Services učitan
     if (typeof window.google === 'undefined') {
+      console.log('Waiting for Google API to load...');
       setTimeout(() => resolve(initGoogleAuth(callback)), 100);
       return;
     }
 
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: CONFIG.GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/userinfo.profile',
-      callback: (response: any) => {
-        callback(response);
-        resolve(response);
-      },
-    });
+    try {
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.GOOGLE_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/userinfo.profile',
+        callback: (response: any) => {
+          console.log('Google auth response:', response);
+          callback(response);
+          resolve(response);
+        },
+      });
 
-    // Pokreni auth flow
-    tokenClient.requestAccessToken();
+      // Pokreni auth flow s popupom
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } catch (error) {
+      console.error('Error initializing Google Auth:', error);
+      reject(error);
+    }
   });
 };
 
@@ -79,14 +86,22 @@ export const fetchUserInfo = async (token: string) => {
  * Obrada token odgovora
  */
 export const handleTokenResponse = (response: any): { success: boolean; userData?: any } => {
+  console.log('handleTokenResponse called with:', response);
+  
   if (response.error) {
-    console.error('Auth error:', response.error);
+    console.error('Auth error in response:', response.error);
+    return { success: false };
+  }
+
+  if (!response.access_token) {
+    console.error('No access token in response');
     return { success: false };
   }
 
   accessToken = response.access_token;
   sessionStorage.setItem('google_access_token', accessToken!);
   sessionStorage.setItem('token_expires', String(Date.now() + (response.expires_in * 1000)));
+  console.log('Token stored successfully, expires in:', response.expires_in, 'seconds');
 
   return { success: true };
 };

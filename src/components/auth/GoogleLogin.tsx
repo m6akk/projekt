@@ -13,17 +13,38 @@ const GoogleLogin: React.FC<GoogleLoginProps> = ({ onLoginSuccess }) => {
   const handleLogin = async () => {
     setLoading(true);
     try {
+      console.log('Starting Google login...');
       await initGoogleAuth(async (response: any) => {
+        console.log('Got response from Google:', response);
+        
+        if (response.error) {
+          console.error('Google error:', response.error);
+          setLoading(false);
+          return;
+        }
+
+        if (!response.access_token) {
+          console.error('No access token in response');
+          setLoading(false);
+          return;
+        }
+
         const result = handleTokenResponse(response);
         
-        if (result.success && response.access_token) {
+        if (result.success) {
           const userData = await fetchUserInfo(response.access_token);
           if (userData) {
+            console.log('User data fetched successfully:', userData);
             sessionStorage.setItem('user_data', JSON.stringify(userData));
             onLoginSuccess(userData);
+          } else {
+            console.error('Failed to fetch user info');
+            setLoading(false);
           }
+        } else {
+          console.error('Token response failed');
+          setLoading(false);
         }
-        setLoading(false);
       });
     } catch (error) {
       console.error('Login error:', error);
