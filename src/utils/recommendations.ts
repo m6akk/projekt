@@ -123,8 +123,15 @@ export function generateUserBasedRecommendationsExcludingViewed(
   );
   console.log('[recommendations] Viewed IDs (after filter -only existing):', viewedRecipesExisting);
   
-  const unviewed = allRecipes.filter((r) => !viewedRecipesExisting.has(r.id));
+  // Prvo pokušaj s nepregledanim receptima
+  let unviewed = allRecipes.filter((r) => !viewedRecipesExisting.has(r.id));
   console.log('[recommendations] Unviewed recipes count:', unviewed.length);
+  
+  // Ako nema nepregledanih, koristi sve kao fallback
+  if (unviewed.length === 0) {
+    console.log('[recommendations] No unviewed recipes - using all recipes as fallback');
+    unviewed = allRecipes;
+  }
   
   const mapped = unviewed.map((r) => {
     const similarity = cosineSimilarity(userProfile, getRecipeFeatures(r));

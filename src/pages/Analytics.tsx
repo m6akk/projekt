@@ -373,6 +373,7 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
   const recipes = getStoredRecipes();
   const [recommendations, setRecommendations] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
+  const [allRecipesViewed, setAllRecipesViewed] = useState(false);
 
   useEffect(() => {
     async function loadRecommendations() {
@@ -416,19 +417,28 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
 
         // 4. Pretvori Map u Set kako bi ga mogao koristiti recommendation funkcija
         const viewedSet = new Set(viewedRecipes.keys());
+        
+        // Filtriraj samo one koji postoje
+        const validIds = new Set(recipes.map(r => r.id));
+        const validViewedSet = new Set(Array.from(viewedSet).filter(id => validIds.has(id)));
 
         // 5. Generiraj preporuke koristeći GA4 profil, ali isključi pregledane recepte
         console.log('[RecommendationsTab] Total recipes available:', recipes.length);
-        console.log('[RecommendationsTab] Viewed recipes:', Array.from(viewedSet));
+        console.log('[RecommendationsTab] Viewed recipes (valid):', Array.from(validViewedSet));
         
         const recs = generateUserBasedRecommendationsExcludingViewed(
           userProfile,
           recipes,
-          viewedSet,
+          validViewedSet,
           6
         );
 
         console.log('[RecommendationsTab] Recommendations generated:', recs.length);
+        
+        // Spremi metadata jesu li svi recepti pregledani
+        const allViewed = validViewedSet.size === recipes.length;
+        setAllRecipesViewed(allViewed);
+        
         setRecommendations(recs);
       } catch (error) {
         console.error('[RecommendationsTab] Error loading recommendations:', error);
@@ -471,7 +481,18 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
     );
   }
 
-  return <RecipeRecommendationCards recommendations={recommendations} />;
+  return (
+    <div>
+      {allRecipesViewed && (
+        <div className="mb-6 bg-blue-50 border-[3px] border-blue-300 rounded-lg p-4">
+          <p className="text-blue-700 text-sm">
+            ✨ <strong>Odličan izbor!</strong> Pogledao si sve dostupne recepte. Evo preporuka sličnih recepti koje si voli!
+          </p>
+        </div>
+      )}
+      <RecipeRecommendationCards recommendations={recommendations} />
+    </div>
+  );
 };
 
 // Funnel analysis tab component  
