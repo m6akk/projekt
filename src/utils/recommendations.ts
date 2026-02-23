@@ -1,4 +1,4 @@
-import { Recipe, recipes } from '@/data/recipes';
+import { Recipe } from '@/data/recipes';
 
 // Recipe feature vectors: [vegetarijanstvo, teško, brzo, zdrava_prehrana, popularne_kategorije]
 export interface RecipeFeatures {
@@ -53,65 +53,8 @@ export function cosineSimilarity(vecA: RecipeFeatures, vecB: RecipeFeatures): nu
 }
 
 /**
- * Dohvaća korisnički profil na temelju pregledanih recepata iz localStorage
- */
-export function getUserProfileFromHistory(): RecipeFeatures {
-  try {
-    const history = JSON.parse(localStorage.getItem('recipe_view_history') || '[]');
-    
-    if (!history.length) {
-      return {
-        vegetarijanstvo: 0.5,
-        težina: 0.5,
-        brzina: 0.5,
-        zdravlje: 0.5,
-        slat_deserti: 0.5,
-      };
-    }
-
-    // Prosječno svojstva pregleda recepti
-    const avg = {
-      vegetarijanstvo: 0,
-      težina: 0,
-      brzina: 0,
-      zdravlje: 0,
-      slat_deserti: 0,
-    };
-
-    history.forEach((recipeId: number) => {
-      const recipe = recipes.find(r => r.id === recipeId);
-      if (recipe) {
-        const features = getRecipeFeatures(recipe);
-        avg.vegetarijanstvo += features.vegetarijanstvo;
-        avg.težina += features.težina;
-        avg.brzina += features.brzina;
-        avg.zdravlje += features.zdravlje;
-        avg.slat_deserti += features.slat_deserti;
-      }
-    });
-
-    const count = history.length;
-    return {
-      vegetarijanstvo: Math.min(avg.vegetarijanstvo / count, 1),
-      težina: Math.min(avg.težina / count, 1),
-      brzina: Math.min(avg.brzina / count, 1),
-      zdravlje: Math.min(avg.zdravlje / count, 1),
-      slat_deserti: Math.min(avg.slat_deserti / count, 1),
-    };
-  } catch (error) {
-    console.error('Error getting user profile:', error);
-    return {
-      vegetarijanstvo: 0.5,
-      težina: 0.5,
-      brzina: 0.5,
-      zdravlje: 0.5,
-      slat_deserti: 0.5,
-    };
-  }
-}
-
-/**
- * Generiraj preporuke za recept slične destinaciji (ili zasebno ako je za analytics)
+ * Generiraj preporuke za slične recepte (content-based / recipe-to-recipe)
+ * Uspoređuje karakteristike trenutnog recepta s drugim receptima
  */
 export function generateSimilarRecipeRecommendations(
   recipe: Recipe,
@@ -132,30 +75,14 @@ export function generateSimilarRecipeRecommendations(
   return recommendations;
 }
 
+
 /**
- * Generiraj preporuke temeljene na korisniku
+ * Generiraj preporuke temeljene na GA4 korisnički profil - SAMO Google Analytics podaci
+ * @param userProfile - RecipeFeatures profil generiran iz GA4 podataka
+ * @param allRecipes - Svi dostupni recepti
+ * @param limit - Broj preporuka
  */
 export function generateUserBasedRecommendations(
-  allRecipes: Recipe[],
-  limit: number = 3
-): Array<Recipe & { similarity: number }> {
-  const userProfile = getUserProfileFromHistory();
-
-  const recommendations = allRecipes
-    .map((r) => ({
-      ...r,
-      similarity: cosineSimilarity(userProfile, getRecipeFeatures(r)),
-    }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, limit);
-
-  return recommendations;
-}
-
-/**
- * Generiraj preporuke temeljene na GA4 podacima (stvarne preglede korisnika)
- */
-export function generateUserBasedRecommendationsFromGA4(
   userProfile: RecipeFeatures,
   allRecipes: Recipe[],
   limit: number = 3
