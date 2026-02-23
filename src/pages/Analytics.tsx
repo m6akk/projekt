@@ -395,11 +395,14 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
         // 3. Generiraj profil na temelju stvarnih pregleda
         const userProfile = calculateProfileFromGA4Views(viewedRecipes, recipes);
 
-        // 4. Generiraj preporuke koristeći GA4 profil, ali isključi pregledane recepte
+        // 4. Pretvori Map u Set kako bi ga mogao koristiti recommendation funkcija
+        const viewedSet = new Set(viewedRecipes.keys());
+
+        // 5. Generiraj preporuke koristeći GA4 profil, ali isključi pregledane recepte
         const recs = generateUserBasedRecommendationsExcludingViewed(
           userProfile,
           recipes,
-          viewedRecipes,
+          viewedSet,
           6
         );
 
