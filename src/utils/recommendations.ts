@@ -97,3 +97,28 @@ export function generateUserBasedRecommendations(
 
   return recommendations;
 }
+
+/**
+ * Generiraj preporuke temeljene na GA4 profilu, ali isključi već pregledane recepte
+ * @param userProfile - RecipeFeatures profil generiran iz GA4 podataka
+ * @param allRecipes - Svi dostupni recepti
+ * @param viewedRecipeIds - Set ID-eva koji su već pregledani (iz GA4)
+ * @param limit - Broj preporuka
+ */
+export function generateUserBasedRecommendationsExcludingViewed(
+  userProfile: RecipeFeatures,
+  allRecipes: Recipe[],
+  viewedRecipeIds: Set<number>,
+  limit: number = 6
+): Array<Recipe & { similarity: number }> {
+  const recommendations = allRecipes
+    .filter((r) => !viewedRecipeIds.has(r.id)) // Isključi pregledane
+    .map((r) => ({
+      ...r,
+      similarity: cosineSimilarity(userProfile, getRecipeFeatures(r)),
+    }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit);
+
+  return recommendations;
+}

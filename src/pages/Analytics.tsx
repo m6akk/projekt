@@ -14,7 +14,11 @@ import {
 } from '../services/googleAnalytics';
 import { AnalyticsData, PageViewData } from '../types/analytics';
 import { getStoredRecipes } from '@/hooks/useRecipeStorage';
-import { generateSimilarRecipeRecommendations, cosineSimilarity, getRecipeFeatures } from '@/utils/recommendations';
+import { 
+  generateUserBasedRecommendationsExcludingViewed, 
+  cosineSimilarity, 
+  getRecipeFeatures 
+} from '@/utils/recommendations';
 import { fetchUserInteractionsFromGA4, analyzeRecipeViewsFromGA4, calculateProfileFromGA4Views } from '@/services/ga4Recommendations';
 import { performFunnelAnalysis, generateFunnelInsights, FunnelStep } from '@/services/ga4Funnel';
 import { performRetentionAnalysis, generateRetentionInsights, RetentionSegment } from '@/services/ga4Retention';
@@ -391,15 +395,13 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
         // 3. Generiraj profil na temelju stvarnih pregleda
         const userProfile = calculateProfileFromGA4Views(viewedRecipes, recipes);
 
-        // 4. Izračunaj cosine similarity
-        const recs = recipes
-          .filter(r => !viewedRecipes.has(r.id)) // Ne preporučuj pregledane
-          .map(r => ({
-            ...r,
-            similarity: cosineSimilarity(userProfile, getRecipeFeatures(r))
-          }))
-          .sort((a, b) => b.similarity - a.similarity)
-          .slice(0, 6);
+        // 4. Generiraj preporuke koristeći GA4 profil, ali isključi pregledane recepte
+        const recs = generateUserBasedRecommendationsExcludingViewed(
+          userProfile,
+          recipes,
+          viewedRecipes,
+          6
+        );
 
         setRecommendations(recs);
       } catch (error) {
