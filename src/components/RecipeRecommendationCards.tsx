@@ -26,7 +26,7 @@ const RecipeRecommendationCards: React.FC<RecipeRecommendationCardsProps> = ({
   return (
     <div>
       <h2 className="text-2xl font-display font-bold text-primary mb-6">
-        Slični recepti
+        Preporučeni recepti
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {recommendations.map((recipe, index) => {

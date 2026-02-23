@@ -374,6 +374,9 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
   const [recommendations, setRecommendations] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
   const [allRecipesViewed, setAllRecipesViewed] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [ga4Raw, setGa4Raw] = useState<any | null>(null);
+  const [algorithmSteps, setAlgorithmSteps] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadRecommendations() {
@@ -388,6 +391,7 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
         // 1. Dohvati stvarne podatke iz GA4
         const ga4Data = await fetchUserInteractionsFromGA4(accessToken);
         console.log('[RecommendationsTab] GA4 data received, rows:', ga4Data?.rows?.length);
+        setGa4Raw(ga4Data);
         
         if (!ga4Data) {
           console.warn('[RecommendationsTab] No GA4 data returned');
@@ -434,6 +438,18 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
         );
 
         console.log('[RecommendationsTab] Recommendations generated:', recs.length);
+
+        // Build human-readable algorithm steps for debug view
+        const steps: string[] = [];
+        steps.push(`Dohvaćeni GA4 redovi: ${ga4Data?.rows?.length ?? 0}`);
+        steps.push(`Izvučeni pregledani recepti (sirovo): ${Array.from(viewedRecipes.keys()).join(', ') || 'nema'}`);
+        steps.push(`Filtrirano na postojeće recepte: ${existingViewedRecipes.length}`);
+        steps.push(`Kreiran profil korisnika (atributi): ${Object.keys(userProfile || {}).join(', ') || 'nema'}`);
+        steps.push(`Broj recepata u skupu za isključivanje (viewed): ${validViewedSet.size}`);
+        steps.push(`Generirano preporuka prije filtriranja: ${recs.length}`);
+        steps.push(`Svi recepti pregledani: ${allViewed ? 'da' : 'ne'}`);
+        steps.push('Razlog preporuka: koristi se sličnost između profila korisnika i značajki recepata (cosine similarity). Isključuju se recepti koje je korisnik već pogledao. Ako su svi recepti pregledani, koristi se fallback logika koja prikazuje najbolje podudaranja ili najpopularnije recepte.');
+        setAlgorithmSteps(steps);
         
         // Spremi metadata jesu li svi recepti pregledani
         const allViewed = validViewedSet.size === recipes.length;
@@ -483,13 +499,39 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
 
   return (
     <div>
-      {allRecipesViewed && (
-        <div className="mb-6 bg-blue-50 border-[3px] border-blue-300 rounded-lg p-4">
-          <p className="text-blue-700 text-sm">
-            ✨ <strong>Odličan izbor!</strong> Pogledao si sve dostupne recepte. Evo preporuka sličnih recepti koje si voli!
-          </p>
+      <div className="flex items-start justify-between mb-4">
+        {allRecipesViewed && (
+          <div className="mb-0 bg-blue-50 border-[3px] border-blue-300 rounded-lg p-4">
+            <p className="text-blue-700 text-sm">
+              ✨ <strong>Odličan izbor!</strong> Pogledao si sve dostupne recepte. Evo preporučenih recepata koje bi ti se mogle svidjeti!
+            </p>
+          </div>
+        )}
+
+        <div className="ml-4">
+          <button
+            onClick={() => setDebugOpen(!debugOpen)}
+            className="cartoon-button bg-gray-100 text-gray-800 px-3 py-2 rounded shadow-sm"
+          >
+            {debugOpen ? 'Zatvori debug' : 'Prikaži debug'}
+          </button>
+        </div>
+      </div>
+
+      {debugOpen && (
+        <div className="mb-6 bg-gray-50 p-4 rounded border-[1px] border-gray-200">
+          <h3 className="font-bold mb-2">Dohvaćeni podaci (GA4)</h3>
+          <pre className="text-xs max-h-48 overflow-auto bg-white p-2 rounded border mb-3">{JSON.stringify(ga4Raw, null, 2)}</pre>
+
+          <h3 className="font-bold mb-2">Koraci algoritma</h3>
+          <ol className="list-decimal list-inside text-sm space-y-1">
+            {algorithmSteps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
         </div>
       )}
+
       <RecipeRecommendationCards recommendations={recommendations} />
     </div>
   );
