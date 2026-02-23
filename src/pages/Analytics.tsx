@@ -396,10 +396,16 @@ const RecommendationsTab: React.FC<{ accessToken: string | null }> = ({ accessTo
 
         // 2. Analiziraj koje recepte je korisnik gledao
         const viewedRecipes = analyzeRecipeViewsFromGA4(ga4Data);
-        console.log('[RecommendationsTab] Viewed recipes count:', viewedRecipes.size);
+        console.log('[RecommendationsTab] Viewed recipes count (from GA4):', viewedRecipes.size);
         
-        if (viewedRecipes.size === 0) {
-          console.warn('[RecommendationsTab] No recipe views found');
+        // Filtriraj samo recepte koji postoje u bazi
+        const validRecipeIds = new Set(recipes.map(r => r.id));
+        const existingViewedRecipes = Array.from(viewedRecipes.keys()).filter(id => validRecipeIds.has(id));
+        console.log('[RecommendationsTab] Valid recipes count (after filtering):', existingViewedRecipes.length);
+        console.log('[RecommendationsTab] Excluded recipes:', Array.from(viewedRecipes.keys()).filter(id => !validRecipeIds.has(id)));
+        
+        if (existingViewedRecipes.length === 0) {
+          console.warn('[RecommendationsTab] No valid recipe views found after filtering');
           setLoading(false);
           return;
         }

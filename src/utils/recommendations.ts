@@ -114,9 +114,16 @@ export function generateUserBasedRecommendationsExcludingViewed(
   console.log('[recommendations] Starting generateUserBasedRecommendationsExcludingViewed');
   console.log('[recommendations] User profile:', userProfile);
   console.log('[recommendations] Total recipes:', allRecipes.length);
-  console.log('[recommendations] Viewed IDs:', viewedRecipeIds);
+  console.log('[recommendations] Viewed IDs (before filter):', viewedRecipeIds);
   
-  const unviewed = allRecipes.filter((r) => !viewedRecipeIds.has(r.id));
+  // Filtriraj samo ID-eve koji zaista postoje u receptima
+  const validRecipeIds = new Set(allRecipes.map(r => r.id));
+  const viewedRecipesExisting = new Set(
+    Array.from(viewedRecipeIds).filter(id => validRecipeIds.has(id))
+  );
+  console.log('[recommendations] Viewed IDs (after filter -only existing):', viewedRecipesExisting);
+  
+  const unviewed = allRecipes.filter((r) => !viewedRecipesExisting.has(r.id));
   console.log('[recommendations] Unviewed recipes count:', unviewed.length);
   
   const mapped = unviewed.map((r) => {

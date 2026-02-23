@@ -101,7 +101,15 @@ export function calculateProfileFromGA4Views(
   viewedRecipes: Map<number, any>,
   allRecipes: Recipe[]
 ): RecipeFeatures {
-  if (viewedRecipes.size === 0) {
+  // Kreiraj Set validnih recipe ID-eva
+  const validRecipeIds = new Set(allRecipes.map(r => r.id));
+  
+  // Filtriraj samo recepte koji postoje
+  const existingRecipes = new Map(
+    Array.from(viewedRecipes.entries()).filter(([id]) => validRecipeIds.has(id))
+  );
+  
+  if (existingRecipes.size === 0) {
     return {
       vegetarijanstvo: 0.5,
       težina: 0.5,
@@ -118,7 +126,7 @@ export function calculateProfileFromGA4Views(
   let avgSweet = 0;
   let viewCount = 0;
 
-  viewedRecipes.forEach((data, recipeId) => {
+  existingRecipes.forEach((data, recipeId) => {
     const recipe = allRecipes.find(r => r.id === recipeId);
     if (!recipe) return;
 
