@@ -1,4 +1,4 @@
-import { Recipe } from '@/data/recipes';
+import { Recipe, recipes } from '@/data/recipes';
 
 // Recipe feature vectors: [vegetarijanstvo, teško, brzo, zdrava_prehrana, popularne_kategorije]
 export interface RecipeFeatures {
@@ -79,16 +79,24 @@ export function getUserProfileFromHistory(): RecipeFeatures {
     };
 
     history.forEach((recipeId: number) => {
-      // U stvarnoj aplikaciji, trebao bi pristup recipe objektu
-      // Za sada, koristi se srednja vrijednost
+      const recipe = recipes.find(r => r.id === recipeId);
+      if (recipe) {
+        const features = getRecipeFeatures(recipe);
+        avg.vegetarijanstvo += features.vegetarijanstvo;
+        avg.težina += features.težina;
+        avg.brzina += features.brzina;
+        avg.zdravlje += features.zdravlje;
+        avg.slat_deserti += features.slat_deserti;
+      }
     });
 
+    const count = history.length;
     return {
-      vegetarijanstvo: Math.min(avg.vegetarijanstvo / history.length || 0.5, 1),
-      težina: Math.min(avg.težina / history.length || 0.5, 1),
-      brzina: Math.min(avg.brzina / history.length || 0.5, 1),
-      zdravlje: Math.min(avg.zdravlje / history.length || 0.5, 1),
-      slat_deserti: Math.min(avg.slat_deserti / history.length || 0.5, 1),
+      vegetarijanstvo: Math.min(avg.vegetarijanstvo / count, 1),
+      težina: Math.min(avg.težina / count, 1),
+      brzina: Math.min(avg.brzina / count, 1),
+      zdravlje: Math.min(avg.zdravlje / count, 1),
+      slat_deserti: Math.min(avg.slat_deserti / count, 1),
     };
   } catch (error) {
     console.error('Error getting user profile:', error);
@@ -133,6 +141,25 @@ export function generateUserBasedRecommendations(
 ): Array<Recipe & { similarity: number }> {
   const userProfile = getUserProfileFromHistory();
 
+  const recommendations = allRecipes
+    .map((r) => ({
+      ...r,
+      similarity: cosineSimilarity(userProfile, getRecipeFeatures(r)),
+    }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit);
+
+  return recommendations;
+}
+
+/**
+ * Generiraj preporuke temeljene na GA4 podacima (stvarne preglede korisnika)
+ */
+export function generateUserBasedRecommendationsFromGA4(
+  userProfile: RecipeFeatures,
+  allRecipes: Recipe[],
+  limit: number = 3
+): Array<Recipe & { similarity: number }> {
   const recommendations = allRecipes
     .map((r) => ({
       ...r,
